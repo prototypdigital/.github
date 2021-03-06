@@ -1,0 +1,7 @@
+{
+  "name": "Gatsby Firebase with functions",
+  "description": "Base workflow that builds a Gatsby project, and deploys it to firebase along with functions.",
+  "iconName": "gatsby",
+  "categories": ["Typescript", "Firebase"],
+  "filePatterns": ["package.json$", ".*\\.md$"]
+}
