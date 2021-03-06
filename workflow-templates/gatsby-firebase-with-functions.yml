@@ -1,0 +1,86 @@
+name: test
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      ENV_SECRETS: ${{ secrets.DEV_SECRETS }}
+
+    strategy:
+      matrix:
+        include:
+          - project: app
+            workspace: "."
+            deployment-type: hosting
+
+          - project: functions
+            workspace: "./functions"
+            deployment-type: functions
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Cache node modules
+        id: yarn-cache
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-node-modules
+        with:
+          path: "**/node_modules"
+          key: ${{ runner.os }}-${{ matrix.deployment-type }}-${{ env.cache-name }}-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.deployment-type }}-${{ env.cache-name }}-
+            ${{ runner.os }}-${{ matrix.deployment-type }}-
+            ${{ runner.os }}-
+
+      - name: Download environment secrets
+        uses: RollyPeres/base64-to-path@v1
+        with:
+          filePath: ${{ github.workspace }}/.env.production
+          encodedString: ${{ env.ENV_SECRETS }}
+
+      - name: Save PROJECT_ID to a local env variable
+        run: echo "PROJECT_ID=$(cat .env.production |grep PROJECT_ID |awk -F"=" '{print $2}')" >> $GITHUB_ENV
+
+      - name: Install node
+        uses: actions/setup-node@v2-beta
+        with:
+          node-version: "10"
+
+      - name: Install packages
+        if: steps.yarn-cache.outputs.cache-hit != 'true'
+        run: yarn --cwd ${{ matrix.workspace }} install
+
+      - name: Build project
+        run: yarn --cwd ${{ matrix.workspace }} build
+
+      - name: Deploy to Firebase
+        uses: w9jds/firebase-action@master
+        with:
+          args: deploy --only ${{ matrix.deployment-type }} --message \"${{ github.event.head_commit.message }}\"
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          PROJECT_ID: ${{ env.PROJECT_ID }}
+
+      - name: Archive build artifact
+        if: matrix.deployment-type == 'hosting'
+        run: zip -r -q public.zip public
+
+      - name: Publish build artifact
+        if: matrix.deployment-type == 'hosting'
+        uses: actions/upload-artifact@v2
+        with:
+          path: public
+
+      - uses: act10ns/slack@v1
+        with:
+          status: ${{ job.status }}
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
