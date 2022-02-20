@@ -1,0 +1,59 @@
+name: React Firebase CI
+on:
+  push:
+    branches:
+      - develop
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install node
+        uses: actions/setup-node@v1
+
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+
+      - name: Cache node modules
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: | 
+            ${{ runner.os }}-yarn-
+
+      - name: Install packages
+        if: steps.yarn-cache.outputs.cache-hit != 'true'
+        run: yarn install
+
+      - name: Run production build
+        run: yarn build
+
+      - name: Prepare artifact folder
+        run: |
+          mkdir deploy
+          cp -r {.firebaserc,firebase.json,build} deploy
+      - name: Publish a Build artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: build
+          path: deploy
+  deploy:
+    runs-on: ubuntu-20.04
+    needs: build
+    steps:
+      - name: Download a Build Artifact
+        uses: actions/download-artifact@v2.0.6
+        with:
+          name: build
+          path: .
+
+      - name: Deploy to Firebase
+        uses: w9jds/firebase-action@master
+        with:
+          args: deploy --only hosting:dev
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
