@@ -1,0 +1,8 @@
+{
+    "name": "React Firebase CI",
+    "description": "Base workflow that builds a React project, and deploys it to firebase.",
+    "iconName": "react-icon",
+    "categories": ["Typescript", "Firebase"],
+    "filePatterns": ["package.json$", ".*\\.md$"]
+  }
+  
