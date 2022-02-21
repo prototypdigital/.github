@@ -1,8 +1,9 @@
 name: React Firebase CI
 on:
-  push:
-    branches:
-      - develop
+  workflow_call:
+    push:
+      branches:
+        - develop
 jobs:
   build:
     runs-on: ubuntu-20.04
